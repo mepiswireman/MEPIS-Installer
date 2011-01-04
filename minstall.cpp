@@ -25,6 +25,21 @@ MInstall::MInstall(QWidget *parent) : QWidget(parent) {
   FILE *fp;
   int i;
 
+  // timezone
+  timezoneCombo->clear();
+  fp = popen("awk -F '\\t' '!/^#/ { print $3 }' /usr/share/zoneinfo/zone.tab | sort", "r");
+  if (fp != NULL) {
+    while (fgets(line, sizeof line, fp) != NULL) {
+      i = strlen(line);
+      line[--i] = '\0';
+     if (line != NULL && strlen(line) > 1) {
+        timezoneCombo->addItem(line);
+      }
+    }
+    pclose(fp);
+  }
+  timezoneCombo->setCurrentIndex(timezoneCombo->findText("America/New York"));
+
   // keyboard
   system("ls -1 /usr/share/keymaps/i386/azerty > /tmp/mlocale");
   system("ls -1 /usr/share/keymaps/i386/qwerty >> /tmp/mlocale");
@@ -1460,9 +1475,13 @@ void MInstall::setLocale() {
 
   // timezone
   system("cp -f /etc/default/rcS /mnt/mepis/etc/default");
-  system("cp -f /etc/adjtime /mnt/mepis/etc");
-  system("cp -df /etc/localtime /mnt/mepis/etc");
-  system("cp -f /etc/timezone /mnt/mepis/etc");
+  system("cp -f /etc/adjtime /mnt/mepis/etc/");
+  // /etc/localtime is a copy of one of the timezone files in /usr/share/zoneinfo. Use the one selected by the user.
+  cmd = QString("cp -f /usr/share/zoneinfo/%1 /mnt/mepis/etc/localtime").arg(timezoneCombo->currentText());
+  system(cmd.toAscii());
+  // /etc/timezone is text file with the timezone written in it. Write the user-selected timezone in it now.
+  cmd = QString("echo %1 > /mnt/mepis/etc/timezone").arg(timezoneCombo->currentText());
+  system(cmd.toAscii());
 
   if (gmtCheckBox->isChecked()) {
     replaceStringInFile("^UTC=no", "UTC=yes", "/mnt/mepis/etc/default/rcS");
@@ -1719,7 +1738,7 @@ void MInstall::pageDisplayed(int next) {
     case 7:
       ((MMain *)mmn)->setHelpText(tr("<p><b>Localization Defaults</b><br/>Set the default keyboard and locale.  These will apply, unless they are overridden later by the user.</p>"
         "<p><b>Configure Clock</b><br/>If you have an Apple or a pure Unix computer, by default the system clock is set to GMT or Universal Time.  In this case, check the box for 'System clock uses GMT.'</p>"
-        "<p>The CD boots with the timezone preset to EST. You can change the timezone and other time configuration, after you reboot into the new installation, by going to Start Menu > Settings > System Settings > Date & Time</p>"));
+        "<p>The CD boots with the timezone preset to EST, but you can change the installation timezone here. Other time configuration may be changed after you reboot into the new installation, by going to Start Menu > Settings > System Settings > Date & Time</p>"));
       nextButton->setEnabled(true);
       backButton->setEnabled(false);
       break;
